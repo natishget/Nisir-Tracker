@@ -1,9 +1,17 @@
 import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { PrismaModule } from './prisma/prisma.module';
+import { AuthModule } from './auth/auth.module';
+import { UsersModule } from './users/users.module';
+import { OrganizationModule } from './organization/organization.module';
+import { TasksModule } from './tasks/tasks.module';
+import { ReportsModule } from './reports/reports.module';
+import { ProjectsModule } from './projects/projects.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
-  imports: [],
+  imports: [PrismaModule, AuthModule, UsersModule, OrganizationModule, TasksModule, ReportsModule, ProjectsModule, NotificationsModule],
   controllers: [AppController],
   providers: [AppService],
 })

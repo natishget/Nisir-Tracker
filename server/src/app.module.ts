@@ -12,9 +12,11 @@ import { ReportsModule } from './reports/reports.module';
 import { ProjectsModule } from './projects/projects.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { OriginGuardMiddleware } from './common/middleware/origin-guard.middleware';
+import { AppConfigModule } from './common/config/app-config.module';
 
 @Module({
   imports: [
+    AppConfigModule,
     ThrottlerModule.forRoot([
       {
         name: 'default',

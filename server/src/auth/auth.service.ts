@@ -3,21 +3,15 @@ import { UsersService } from '../users/users.service';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { Request, Response } from 'express';
+import { AppConfigService } from '../common/config/app-config.service';
 
 @Injectable()
 export class AuthService {
   constructor(
     private usersService: UsersService,
     private jwtService: JwtService,
+    private config: AppConfigService,
   ) {}
-
-  private getAccessSecret(): string {
-    return process.env.JWT_ACCESS_SECRET || 'fallback_dev_access_secret_nisir_tasker_32chars';
-  }
-
-  private getRefreshSecret(): string {
-    return process.env.JWT_REFRESH_SECRET || 'fallback_dev_refresh_secret_nisir_tasker_32chars';
-  }
 
   async validateUser(username: string, pass: string): Promise<any> {
     const user = await this.usersService.findOneByUsername(username);
@@ -35,16 +29,16 @@ export class AuthService {
     const payload = { username: user.username, sub: user.id, role: user.systemRole };
 
     const accessToken = this.jwtService.sign(payload, {
-      secret: this.getAccessSecret(),
-      expiresIn: (process.env.JWT_ACCESS_EXPIRES_IN || '15m') as any,
+      secret: this.config.jwtAccessSecret,
+      expiresIn: this.config.jwtAccessExpiresIn as any,
     });
 
     const refreshToken = this.jwtService.sign(payload, {
-      secret: this.getRefreshSecret(),
-      expiresIn: (process.env.JWT_REFRESH_EXPIRES_IN || '7d') as any,
+      secret: this.config.jwtRefreshSecret,
+      expiresIn: this.config.jwtRefreshExpiresIn as any,
     });
 
-    const isProd = process.env.NODE_ENV === 'production';
+    const isProd = this.config.isProduction;
 
     response.cookie('accessToken', accessToken, {
       httpOnly: true,
@@ -77,7 +71,7 @@ export class AuthService {
 
     try {
       const payload = this.jwtService.verify(refreshToken, {
-        secret: this.getRefreshSecret(),
+        secret: this.config.jwtRefreshSecret,
       });
 
       const user = await this.usersService.findOneById(payload.sub);
@@ -87,11 +81,11 @@ export class AuthService {
 
       const newPayload = { username: user.username, sub: user.id, role: user.systemRole };
       const accessToken = this.jwtService.sign(newPayload, {
-        secret: this.getAccessSecret(),
-        expiresIn: (process.env.JWT_ACCESS_EXPIRES_IN || '15m') as any,
+        secret: this.config.jwtAccessSecret,
+        expiresIn: this.config.jwtAccessExpiresIn as any,
       });
 
-      const isProd = process.env.NODE_ENV === 'production';
+      const isProd = this.config.isProduction;
       response.cookie('accessToken', accessToken, {
         httpOnly: true,
         secure: isProd,
@@ -111,7 +105,7 @@ export class AuthService {
   }
 
   async logout(response: Response) {
-    const isProd = process.env.NODE_ENV === 'production';
+    const isProd = this.config.isProduction;
     response.clearCookie('accessToken', {
       httpOnly: true,
       secure: isProd,

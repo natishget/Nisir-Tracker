@@ -1,16 +1,14 @@
-import { Injectable, NestMiddleware, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NestMiddleware,
+  ForbiddenException,
+} from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
+import { AppConfigService } from '../config/app-config.service';
 
 @Injectable()
 export class OriginGuardMiddleware implements NestMiddleware {
-  private allowedOrigins: string[];
-
-  constructor() {
-    const rawClients = process.env.CLIENT_URL || 'http://localhost:3000';
-    this.allowedOrigins = rawClients
-      .split(',')
-      .map((origin) => origin.trim().replace(/\/+$/, '').toLowerCase());
-  }
+  constructor(private readonly config: AppConfigService) {}
 
   use(req: Request, res: Response, next: NextFunction) {
     const method = req.method.toUpperCase();
@@ -20,14 +18,17 @@ export class OriginGuardMiddleware implements NestMiddleware {
       return next();
     }
 
+    const allowedOrigins = this.config.allowedOrigins;
     const origin = req.headers['origin'] as string | undefined;
     const referer = req.headers['referer'] as string | undefined;
 
     // Check origin first if present
     if (origin) {
       const normalizedOrigin = origin.trim().replace(/\/+$/, '').toLowerCase();
-      if (!this.allowedOrigins.includes(normalizedOrigin)) {
-        throw new ForbiddenException('Cross-site request blocked: untrusted origin');
+      if (!allowedOrigins.includes(normalizedOrigin)) {
+        throw new ForbiddenException(
+          'Cross-site request blocked: untrusted origin',
+        );
       }
       return next();
     }
@@ -36,12 +37,19 @@ export class OriginGuardMiddleware implements NestMiddleware {
     if (referer) {
       try {
         const refererUrl = new URL(referer);
-        const normalizedRefererOrigin = refererUrl.origin.trim().replace(/\/+$/, '').toLowerCase();
-        if (!this.allowedOrigins.includes(normalizedRefererOrigin)) {
-          throw new ForbiddenException('Cross-site request blocked: untrusted referer');
+        const normalizedRefererOrigin = refererUrl.origin
+          .trim()
+          .replace(/\/+$/, '')
+          .toLowerCase();
+        if (!allowedOrigins.includes(normalizedRefererOrigin)) {
+          throw new ForbiddenException(
+            'Cross-site request blocked: untrusted referer',
+          );
         }
       } catch {
-        throw new ForbiddenException('Cross-site request blocked: invalid referer header');
+        throw new ForbiddenException(
+          'Cross-site request blocked: invalid referer header',
+        );
       }
     }
 

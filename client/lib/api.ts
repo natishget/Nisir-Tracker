@@ -1,4 +1,6 @@
-export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+import { env } from './env';
+
+export const API_URL = env.NEXT_PUBLIC_API_URL;
 
 export async function fetchApi(endpoint: string, options: RequestInit = {}) {
   const url = `${API_URL}${endpoint}`;

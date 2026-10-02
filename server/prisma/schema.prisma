@@ -1,0 +1,271 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum SystemRole {
+  ADMIN
+  CEO
+  DIRECTOR
+  MANAGER
+  STAFF
+}
+
+enum TaskStatus {
+  TO_DO
+  IN_PROGRESS
+  BLOCKED
+  SUBMITTED
+  COMPLETED
+  CANCELLED
+}
+
+enum TaskPriority {
+  LOW
+  NORMAL
+  HIGH
+  CRITICAL
+}
+
+enum ProjectStatus {
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum ReportStatus {
+  DRAFT
+  SUBMITTED
+  REVIEWED
+  APPROVED
+  LOCKED
+}
+
+enum ReportPeriod {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+model Directorate {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  units       Unit[]
+  users       User[]
+  tasks       Task[]
+}
+
+model Unit {
+  id            String      @id @default(uuid())
+  name          String
+  directorateId String
+  directorate   Directorate @relation(fields: [directorateId], references: [id])
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  
+  users         User[]
+  tasks         Task[]
+}
+
+model Position {
+  id          String   @id @default(uuid())
+  name        String   @unique // e.g. "Director", "Manager", "Senior"
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  users       User[]
+}
+
+model User {
+  id            String      @id @default(uuid())
+  email         String      @unique
+  username      String      @unique
+  passwordHash  String
+  firstName     String
+  lastName      String
+  systemRole    SystemRole  @default(STAFF)
+  isActive      Boolean     @default(true)
+  
+  positionId    String?
+  position      Position?   @relation(fields: [positionId], references: [id])
+  
+  directorateId String?
+  directorate   Directorate? @relation(fields: [directorateId], references: [id])
+  
+  unitId        String?
+  unit          Unit?       @relation(fields: [unitId], references: [id])
+  
+  managerId     String?
+  manager       User?       @relation("UserToManager", fields: [managerId], references: [id])
+  subordinates  User[]      @relation("UserToManager")
+  
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  
+  createdTasks  Task[]      @relation("TaskCreator")
+  assignedTasks Task[]      @relation("TaskAssignee")
+  collaboratedTasks Task[]  @relation("TaskCollaborators")
+  
+  reports       Report[]    @relation("ReportAuthor")
+  
+  createdProjects Project[] @relation("ProjectCreator")
+  memberProjects  Project[] @relation("ProjectMembers")
+  
+  auditLogs     AuditLog[]
+  notifications Notification[]
+  
+  @@map("Users")
+}
+
+model Task {
+  id            String       @id @default(uuid())
+  title         String
+  description   String?
+  status        TaskStatus   @default(TO_DO)
+  priority      TaskPriority @default(NORMAL)
+  progress      Int          @default(0) // 0 to 100
+  
+  startDate     DateTime?
+  dueDate       DateTime?
+  completedDate DateTime?
+  statusUpdatedAt DateTime @default(now())
+  
+  creatorId     String
+  creator       User         @relation("TaskCreator", fields: [creatorId], references: [id])
+  
+  assigneeId    String?
+  assignee      User?        @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  
+  collaborators User[]       @relation("TaskCollaborators")
+  
+  directorateId String?
+  directorate   Directorate? @relation(fields: [directorateId], references: [id])
+  
+  unitId        String?
+  unit          Unit?        @relation(fields: [unitId], references: [id])
+  
+  projectId     String?
+  project       Project?     @relation(fields: [projectId], references: [id])
+  
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  
+  activities    TaskActivity[]
+  attachments   Attachment[]
+  comments      Comment[]
+}
+
+model TaskActivity {
+  id          String   @id @default(uuid())
+  taskId      String
+  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  action      String   // e.g. "Task created", "Status changed"
+  details     String?  // JSON or string detailing changes
+  userId      String?
+  
+  createdAt   DateTime @default(now())
+}
+
+model Comment {
+  id          String   @id @default(uuid())
+  content     String
+  taskId      String
+  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId      String
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Attachment {
+  id          String   @id @default(uuid())
+  filename    String
+  originalName String
+  mimeType    String
+  size        Int
+  path        String
+  taskId      String
+  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime @default(now())
+}
+
+model Report {
+  id          String       @id @default(uuid())
+  period      ReportPeriod
+  status      ReportStatus @default(DRAFT)
+  
+  periodStart DateTime
+  periodEnd   DateTime
+  
+  completedTasks Int       @default(0)
+  inProgressTasks Int      @default(0)
+  blockedTasks   Int       @default(0)
+  overdueTasks   Int       @default(0)
+  
+  notes          String?
+  challenges     String?
+  nextPeriodPlan String?
+  
+  authorId    String
+  author      User         @relation("ReportAuthor", fields: [authorId], references: [id])
+  
+  managerComments  String?
+  directorComments String?
+  ceoComments      String?
+  
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  action      String
+  target      String?
+  prevValue   String?
+  newValue    String?
+  ipAddress   String?
+  
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  
+  createdAt   DateTime @default(now())
+}
+
+model Project {
+  id            String       @id @default(uuid())
+  name          String
+  description   String?
+  status        ProjectStatus @default(IN_PROGRESS)
+  
+  creatorId     String
+  creator       User         @relation("ProjectCreator", fields: [creatorId], references: [id])
+  
+  members       User[]       @relation("ProjectMembers")
+  
+  tasks         Task[]
+  
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  link      String?
+  createdAt DateTime @default(now())
+}

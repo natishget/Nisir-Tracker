@@ -1,10 +1,24 @@
-import { Controller, Get, Post, Put, Delete, Body, UseGuards, Param, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  UseGuards,
+  Param,
+  Query,
+} from '@nestjs/common';
 import { OrganizationService } from './organization.service';
 import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { SystemRole } from '@prisma/client';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
+import { CreateDirectorateDto, UpdateDirectorateDto } from './dto/directorate.dto';
+import { CreateUnitDto, UpdateUnitDto } from './dto/unit.dto';
 
 @UseGuards(AuthGuard('jwt'), RolesGuard)
 @Controller('organization')
@@ -43,7 +57,13 @@ export class OrganizationController {
     return this.organizationService.getUsers();
   }
 
-  @Roles(SystemRole.STAFF, SystemRole.MANAGER, SystemRole.DIRECTOR, SystemRole.CEO, SystemRole.ADMIN)
+  @Roles(
+    SystemRole.STAFF,
+    SystemRole.MANAGER,
+    SystemRole.DIRECTOR,
+    SystemRole.CEO,
+    SystemRole.ADMIN,
+  )
   @Get('team')
   getMyTeam(@CurrentUser() user: any) {
     return this.organizationService.getTeamMembers(user.sub);
@@ -57,13 +77,13 @@ export class OrganizationController {
 
   @Roles(SystemRole.ADMIN)
   @Post('users')
-  createUser(@Body() data: any) {
+  createUser(@Body() data: CreateUserDto) {
     return this.organizationService.createUser(data);
   }
 
   @Roles(SystemRole.ADMIN)
   @Put('users/:id')
-  updateUser(@Param('id') id: string, @Body() data: any) {
+  updateUser(@Param('id') id: string, @Body() data: UpdateUserDto) {
     return this.organizationService.updateUser(id, data);
   }
 
@@ -77,13 +97,16 @@ export class OrganizationController {
 
   @Roles(SystemRole.ADMIN)
   @Post('directorates')
-  createDirectorate(@Body() data: any) {
+  createDirectorate(@Body() data: CreateDirectorateDto) {
     return this.organizationService.createDirectorate(data);
   }
 
   @Roles(SystemRole.ADMIN)
   @Put('directorates/:id')
-  updateDirectorate(@Param('id') id: string, @Body() data: any) {
+  updateDirectorate(
+    @Param('id') id: string,
+    @Body() data: UpdateDirectorateDto,
+  ) {
     return this.organizationService.updateDirectorate(id, data);
   }
 
@@ -95,13 +118,13 @@ export class OrganizationController {
 
   @Roles(SystemRole.ADMIN)
   @Post('units')
-  createUnit(@Body() data: any) {
+  createUnit(@Body() data: CreateUnitDto) {
     return this.organizationService.createUnit(data);
   }
 
   @Roles(SystemRole.ADMIN)
   @Put('units/:id')
-  updateUnit(@Param('id') id: string, @Body() data: any) {
+  updateUnit(@Param('id') id: string, @Body() data: UpdateUnitDto) {
     return this.organizationService.updateUnit(id, data);
   }
 

@@ -473,7 +473,8 @@ export default function OrganizationPage() {
                       </TableCell>
                     )}
                   </TableRow>
-                ))}
+                ))
+              )}
               </TableBody>
             </Table>
           </div>

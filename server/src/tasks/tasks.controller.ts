@@ -1,10 +1,23 @@
-import { Controller, Get, Post, Body, Param, UseGuards, Put, Delete } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  UseGuards,
+  Put,
+  Delete,
+} from '@nestjs/common';
 import { TasksService } from './tasks.service';
 import { AuthGuard } from '@nestjs/passport';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { SystemRole } from '@prisma/client';
+import { CreateTaskDto } from './dto/create-task.dto';
+import { UpdateTaskDto } from './dto/update-task.dto';
+import { UpdateProgressDto } from './dto/update-progress.dto';
+import { AddCollaboratorDto } from './dto/add-collaborator.dto';
 
 @UseGuards(AuthGuard('jwt'), RolesGuard)
 @Controller('tasks')
@@ -12,13 +25,17 @@ export class TasksController {
   constructor(private readonly tasksService: TasksService) {}
 
   @Post()
-  createTask(@Body() data: any, @CurrentUser() user: any) {
+  createTask(@Body() data: CreateTaskDto, @CurrentUser() user: any) {
     return this.tasksService.createTask(user.sub, data);
   }
 
   @Post(':id/collaborators')
-  addCollaborator(@Param('id') id: string, @Body('userId') userId: string, @CurrentUser() user: any) {
-    return this.tasksService.addCollaborator(id, userId, user.sub);
+  addCollaborator(
+    @Param('id') id: string,
+    @Body() body: AddCollaboratorDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.tasksService.addCollaborator(id, body.userId, user.sub);
   }
 
   @Get('me')
@@ -26,7 +43,12 @@ export class TasksController {
     return this.tasksService.getMyTasks(user.sub);
   }
 
-  @Roles(SystemRole.MANAGER, SystemRole.DIRECTOR, SystemRole.CEO, SystemRole.ADMIN)
+  @Roles(
+    SystemRole.MANAGER,
+    SystemRole.DIRECTOR,
+    SystemRole.CEO,
+    SystemRole.ADMIN,
+  )
   @Get('team')
   getTeamTasks(@CurrentUser() user: any) {
     return this.tasksService.getTeamTasks(user.sub);
@@ -46,18 +68,23 @@ export class TasksController {
 
   @Put(':id/progress')
   updateProgress(
-    @Param('id') id: string, 
-    @CurrentUser() user: any, 
-    @Body() data: { progress: number, status?: any }
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Body() data: UpdateProgressDto,
   ) {
-    return this.tasksService.updateTaskProgress(id, user.sub, data.progress, data.status);
+    return this.tasksService.updateTaskProgress(
+      id,
+      user.sub,
+      data.progress,
+      data.status,
+    );
   }
 
   @Put(':id')
   updateTask(
-    @Param('id') id: string, 
-    @CurrentUser() user: any, 
-    @Body() data: any
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Body() data: UpdateTaskDto,
   ) {
     return this.tasksService.updateTask(id, user.sub, data);
   }

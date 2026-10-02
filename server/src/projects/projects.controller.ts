@@ -1,10 +1,20 @@
-import { Controller, Get, Post, Put, Body, Param, UseGuards, UnauthorizedException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Body,
+  Param,
+  UseGuards,
+} from '@nestjs/common';
 import { ProjectsService } from './projects.service';
 import { AuthGuard } from '@nestjs/passport';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { SystemRole } from '@prisma/client';
+import { CreateProjectDto } from './dto/create-project.dto';
+import { AddProjectMemberDto } from './dto/add-project-member.dto';
 
 @UseGuards(AuthGuard('jwt'), RolesGuard)
 @Controller('projects')
@@ -13,9 +23,12 @@ export class ProjectsController {
 
   @Roles(SystemRole.DIRECTOR, SystemRole.CEO, SystemRole.ADMIN)
   @Post()
-  createProject(@CurrentUser() user: any, @Body() data: { name: string; description?: string; ownerId?: string }) {
-    // If admin provides an ownerId, use it. Otherwise default to the requester.
-    const creatorId = (user.systemRole === 'ADMIN' && data.ownerId) ? data.ownerId : user.sub;
+  createProject(
+    @CurrentUser() user: any,
+    @Body() data: CreateProjectDto,
+  ) {
+    const creatorId =
+      user.systemRole === 'ADMIN' && data.ownerId ? data.ownerId : user.sub;
     return this.projectsService.createProject(creatorId, data);
   }
 
@@ -31,8 +44,12 @@ export class ProjectsController {
 
   @Roles(SystemRole.DIRECTOR, SystemRole.CEO, SystemRole.ADMIN)
   @Post(':id/members')
-  addMember(@Param('id') id: string, @Body('userId') userId: string, @CurrentUser() user: any) {
-    return this.projectsService.addMember(id, userId, user.sub);
+  addMember(
+    @Param('id') id: string,
+    @Body() body: AddProjectMemberDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.projectsService.addMember(id, body.userId, user.sub);
   }
 
   @Roles(SystemRole.DIRECTOR, SystemRole.CEO, SystemRole.ADMIN)

@@ -2,6 +2,28 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from '../prisma/prisma.service';
 import { SystemRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
+import { CreateDirectorateDto, UpdateDirectorateDto } from './dto/directorate.dto';
+import { CreateUnitDto, UpdateUnitDto } from './dto/unit.dto';
+
+const safeUserSelect = {
+  id: true,
+  email: true,
+  username: true,
+  firstName: true,
+  lastName: true,
+  systemRole: true,
+  isActive: true,
+  directorateId: true,
+  unitId: true,
+  positionId: true,
+  createdAt: true,
+  updatedAt: true,
+  directorate: { select: { id: true, name: true } },
+  unit: { select: { id: true, name: true } },
+  position: { select: { id: true, name: true } },
+};
 
 @Injectable()
 export class OrganizationService {
@@ -41,7 +63,7 @@ export class OrganizationService {
         unit: { select: { id: true, name: true } },
         position: { select: { id: true, name: true } },
         manager: { select: { id: true, firstName: true, lastName: true } },
-      }
+      },
     });
   }
 
@@ -50,15 +72,12 @@ export class OrganizationService {
     if (!user) return [];
 
     let whereClause: any = { managerId: requesterId };
-    
+
     if (user.systemRole === SystemRole.STAFF && user.unitId) {
       whereClause = { unitId: user.unitId };
     } else if (user.systemRole === SystemRole.DIRECTOR && user.directorateId) {
       whereClause = { directorateId: user.directorateId };
-    } else if (user.systemRole === SystemRole.CEO) {
-      // CEO sees all directors or everyone? Just everyone for simplicity.
-      whereClause = {}; 
-    } else if (user.systemRole === SystemRole.ADMIN) {
+    } else if (user.systemRole === SystemRole.CEO || user.systemRole === SystemRole.ADMIN) {
       whereClause = {};
     }
 
@@ -70,7 +89,7 @@ export class OrganizationService {
         lastName: true,
         systemRole: true,
         position: { select: { name: true } },
-      }
+      },
     });
   }
 
@@ -84,19 +103,27 @@ export class OrganizationService {
         systemRole: true,
         unit: { select: { name: true } },
         position: { select: { name: true } },
-      }
+      },
     });
   }
 
-  async createUser(data: any) {
+  async createUser(data: CreateUserDto) {
     if (data.systemRole === SystemRole.DIRECTOR && data.directorateId) {
       const existing = await this.prisma.user.findFirst({
-        where: { systemRole: SystemRole.DIRECTOR, directorateId: data.directorateId, isActive: true }
+        where: {
+          systemRole: SystemRole.DIRECTOR,
+          directorateId: data.directorateId,
+          isActive: true,
+        },
       });
-      if (existing) throw new BadRequestException('A directorate can only have one active director.');
+      if (existing) {
+        throw new BadRequestException('A directorate can only have one active director.');
+      }
     }
 
-    const passwordHash = await bcrypt.hash(data.password || 'Password123!', 10);
+    const passwordToHash = data.password || 'Password123!';
+    const passwordHash = await bcrypt.hash(passwordToHash, 10);
+
     return this.prisma.user.create({
       data: {
         username: data.username,
@@ -109,33 +136,35 @@ export class OrganizationService {
         unitId: data.unitId || null,
         positionId: data.positionId || null,
       },
+      select: safeUserSelect,
     });
   }
 
-  async updateUser(id: string, data: any) {
+  async updateUser(id: string, data: UpdateUserDto) {
     if (data.systemRole === SystemRole.DIRECTOR && data.directorateId && data.isActive !== false) {
       const existing = await this.prisma.user.findFirst({
-        where: { 
-          systemRole: SystemRole.DIRECTOR, 
-          directorateId: data.directorateId, 
+        where: {
+          systemRole: SystemRole.DIRECTOR,
+          directorateId: data.directorateId,
           isActive: true,
-          id: { not: id } 
-        }
+          id: { not: id },
+        },
       });
-      if (existing) throw new BadRequestException('A directorate can only have one active director.');
+      if (existing) {
+        throw new BadRequestException('A directorate can only have one active director.');
+      }
     }
 
-    let updateData: any = {
-      username: data.username,
-      email: data.email,
-      firstName: data.firstName,
-      lastName: data.lastName,
-      systemRole: data.systemRole,
-      isActive: data.isActive,
-      directorateId: data.directorateId || null,
-      unitId: data.unitId || null,
-      positionId: data.positionId || null,
-    };
+    const updateData: any = {};
+    if (data.username !== undefined) updateData.username = data.username;
+    if (data.email !== undefined) updateData.email = data.email;
+    if (data.firstName !== undefined) updateData.firstName = data.firstName;
+    if (data.lastName !== undefined) updateData.lastName = data.lastName;
+    if (data.systemRole !== undefined) updateData.systemRole = data.systemRole;
+    if (data.isActive !== undefined) updateData.isActive = data.isActive;
+    if (data.directorateId !== undefined) updateData.directorateId = data.directorateId || null;
+    if (data.unitId !== undefined) updateData.unitId = data.unitId || null;
+    if (data.positionId !== undefined) updateData.positionId = data.positionId || null;
 
     if (data.password) {
       updateData.passwordHash = await bcrypt.hash(data.password, 10);
@@ -144,12 +173,14 @@ export class OrganizationService {
     return this.prisma.user.update({
       where: { id },
       data: updateData,
+      select: safeUserSelect,
     });
   }
 
   async deleteUser(id: string) {
     return this.prisma.user.delete({
       where: { id },
+      select: safeUserSelect,
     });
   }
 
@@ -165,7 +196,7 @@ export class OrganizationService {
       totalUsers,
       totalTasks,
       totalDirectorates,
-      totalUnits
+      totalUnits,
     };
   }
 
@@ -180,7 +211,7 @@ export class OrganizationService {
       totalCompletedTasks,
       totalCompletedProjects,
       totalToDoTasks,
-      totalOverdueTasks
+      totalOverdueTasks,
     ] = await Promise.all([
       this.prisma.task.count({ where: whereTasks }),
       this.prisma.task.count({ where: { ...whereTasks, projectId: { not: null } } }),
@@ -188,13 +219,13 @@ export class OrganizationService {
       this.prisma.task.count({ where: { ...whereTasks, status: 'COMPLETED' } }),
       this.prisma.project.count({ where: { ...whereProjects, status: 'COMPLETED' } }),
       this.prisma.task.count({ where: { ...whereTasks, status: 'TO_DO' } }),
-      this.prisma.task.count({ 
-        where: { 
-          ...whereTasks, 
-          status: { not: 'COMPLETED' }, 
-          dueDate: { lt: new Date(new Date().setHours(0,0,0,0)) } 
-        } 
-      })
+      this.prisma.task.count({
+        where: {
+          ...whereTasks,
+          status: { not: 'COMPLETED' },
+          dueDate: { lt: new Date(new Date().setHours(0, 0, 0, 0)) },
+        },
+      }),
     ]);
 
     return {
@@ -204,28 +235,26 @@ export class OrganizationService {
       totalCompletedTasks,
       totalCompletedProjects,
       totalToDoTasks,
-      totalOverdueTasks
+      totalOverdueTasks,
     };
   }
 
-  // --- Organizational Structure Management ---
-
-  async createDirectorate(data: any) {
+  async createDirectorate(data: CreateDirectorateDto) {
     return this.prisma.directorate.create({
       data: {
         name: data.name,
         description: data.description,
-      }
+      },
     });
   }
 
-  async updateDirectorate(id: string, data: any) {
+  async updateDirectorate(id: string, data: UpdateDirectorateDto) {
     return this.prisma.directorate.update({
       where: { id },
       data: {
         name: data.name,
         description: data.description,
-      }
+      },
     });
   }
 
@@ -235,22 +264,22 @@ export class OrganizationService {
     });
   }
 
-  async createUnit(data: any) {
+  async createUnit(data: CreateUnitDto) {
     return this.prisma.unit.create({
       data: {
         name: data.name,
         directorateId: data.directorateId,
-      }
+      },
     });
   }
 
-  async updateUnit(id: string, data: any) {
+  async updateUnit(id: string, data: UpdateUnitDto) {
     return this.prisma.unit.update({
       where: { id },
       data: {
         name: data.name,
         directorateId: data.directorateId,
-      }
+      },
     });
   }
 

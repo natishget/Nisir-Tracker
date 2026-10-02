@@ -18,14 +18,19 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         },
       ]),
       ignoreExpiration: false,
-      secretOrKey: process.env.JWT_ACCESS_SECRET || 'your_access_secret_key',
+      secretOrKey:
+        process.env.JWT_ACCESS_SECRET ||
+        'fallback_dev_access_secret_nisir_tasker_32chars',
     });
   }
 
   async validate(payload: any) {
+    if (!payload || !payload.sub) {
+      throw new UnauthorizedException('Invalid token payload');
+    }
     const user = await this.usersService.findOneById(payload.sub);
     if (!user || !user.isActive) {
-      throw new UnauthorizedException();
+      throw new UnauthorizedException('User account is inactive or not found');
     }
     // Remove passwordHash before returning
     const { passwordHash, ...result } = user;

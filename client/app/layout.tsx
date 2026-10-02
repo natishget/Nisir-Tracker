@@ -11,6 +11,9 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "Nisir Tasker",
   description: "Task Management and Organizational Reporting System",
+  icons: {
+    icon: "/logo.png"
+  }
 };
 
 export default function RootLayout({
